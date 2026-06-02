@@ -11,7 +11,8 @@ import UniformTypeIdentifiers // WICHTIG für den fileImporter
 struct ContentView: View {
     @StateObject private var viewModel = TimeTrackerViewModel()
     @Environment(\.undoManager) var undoManager
-    
+    @State private var showReportSheet = false
+
     #if os(iOS)
     @State private var showFileImporter = false
     #endif
@@ -47,7 +48,16 @@ struct ContentView: View {
                 }
                 #endif
                 
-                // 2. BEENDEN BUTTON (Nur macOS)
+                // 2. REPORT BUTTON
+                Button(action: { showReportSheet = true }) {
+                    Image(systemName: "square.and.arrow.up")
+                        .font(.title2)
+                }
+                #if os(macOS)
+                .buttonStyle(.plain)
+                #endif
+
+                // 3. BEENDEN BUTTON (Nur macOS)
                 #if os(macOS)
                 Button(action: { NSApplication.shared.terminate(nil) }) {
                     Image(systemName: "xmark.circle.fill")
@@ -100,6 +110,9 @@ struct ContentView: View {
         #if os(macOS)
         .frame(minWidth: 550, minHeight: 600)
         #endif
+        .sheet(isPresented: $showReportSheet) {
+            ReportView(viewModel: viewModel)
+        }
     }
     
     // Hilfsfunktionen (scrollToBottom, itemFormatter) hier lassen...
