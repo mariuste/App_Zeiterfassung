@@ -16,27 +16,42 @@ struct ReportGenerator {
 
     @MainActor
     static func generatePDF(entries: [TimeEntry], period: ReportPeriod, authorName: String) -> Data? {
-        let createdAt = Date()
         let content = PDFContentView(
             entries: entries,
             period: period,
             authorName: authorName,
-            createdAt: createdAt
+            createdAt: Date()
         )
 
         let renderer = ImageRenderer(content: content)
-        renderer.scale = 2.0  // 144dpi für scharfe Ausgabe
+        renderer.scale = 1.0  // Punkte, nicht Pixel — PDF ist vektorbasiert
 
+        let a4Width: CGFloat = 595   // A4 bei 72dpi
+        let a4Height: CGFloat = 842
         let mutableData = NSMutableData()
-        renderer.render { size, context in
-            var mediaBox = CGRect(origin: .zero, size: size)
+
+        renderer.render { size, drawContent in
+            let totalPages = max(1, Int(ceil(size.height / a4Height)))
+            var mediaBox = CGRect(x: 0, y: 0, width: a4Width, height: a4Height)
+
             guard let consumer = CGDataConsumer(data: mutableData),
                   let pdfContext = CGContext(consumer: consumer, mediaBox: &mediaBox, nil)
             else { return }
 
-            pdfContext.beginPDFPage(nil)
-            context(pdfContext)
-            pdfContext.endPDFPage()
+            for page in 0..<totalPages {
+                // Verschiebung: Seite N zeigt den Bereich von y=(size.height - (N+1)*a4Height)
+                // bis y=(size.height - N*a4Height) des Inhalts (PDF: y=0 unten)
+                let yOffset = CGFloat(page + 1) * a4Height - size.height
+
+                pdfContext.beginPDFPage(nil)
+                pdfContext.saveGState()
+                pdfContext.clip(to: CGRect(x: 0, y: 0, width: a4Width, height: a4Height))
+                pdfContext.translateBy(x: 0, y: yOffset)
+                drawContent(pdfContext)
+                pdfContext.restoreGState()
+                pdfContext.endPDFPage()
+            }
+
             pdfContext.closePDF()
         }
 
